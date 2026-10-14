@@ -21,4 +21,16 @@ class JournalEntryTest {
                 new Posting("customer-alice", Direction.CREDIT, 9_000) // £10 missing
         )));
     }
+
+    @Test
+    void rejectsEmptyEntry() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new JournalEntry(List.of()));
+    }
+
+    @Test
+    void rejectsSinglePosting() {
+        assertThrows(IllegalArgumentException.class, () -> new JournalEntry(List.of(
+                new Posting("customer-alice", Direction.DEBIT, 10_000))));
+    }
 }

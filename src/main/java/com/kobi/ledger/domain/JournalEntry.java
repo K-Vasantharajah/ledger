@@ -4,6 +4,10 @@ import java.util.List;
 
 public record JournalEntry(List<Posting> postings) {
     public JournalEntry {
+        if (postings.size() < 2) {
+            throw new IllegalArgumentException("Journal entry must contain at least two postings");
+        }
+
         long debits = 0;
         long credits = 0;
 
