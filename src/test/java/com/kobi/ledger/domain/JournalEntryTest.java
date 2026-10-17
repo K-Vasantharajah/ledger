@@ -15,11 +15,15 @@ class JournalEntryTest {
         return new JournalEntry("test-key", LocalDate.of(2026, 10, 17), "Test entry", postings);
     }
 
+    private static List<Posting> balancedPostings() {
+        return List.of(
+                new Posting(SAFEGUARDING_BANK, Direction.DEBIT, 10_000),
+                new Posting(CUSTOMER_ALICE, Direction.CREDIT, 10_000));
+    }
+
     @Test
     void acceptsBalancedEntry() {
-        var entry = entryWith(List.of(
-                new Posting(SAFEGUARDING_BANK, Direction.DEBIT, 10_000),
-                new Posting(CUSTOMER_ALICE, Direction.CREDIT, 10_000)));
+        var entry = entryWith(balancedPostings());
         assertEquals(2, entry.postings().size());
     }
 
@@ -42,4 +46,23 @@ class JournalEntryTest {
         assertThrows(IllegalArgumentException.class, () -> entryWith(List.of(
                 new Posting(CUSTOMER_ALICE, Direction.DEBIT, 10_000))));
     }
+
+    @Test
+    void rejectsBlankIdempotencyKey() {
+        assertThrows(IllegalArgumentException.class, () -> new JournalEntry(
+                "  ", LocalDate.of(2026, 10, 17), "Test entry", balancedPostings()));
+    }
+
+    @Test
+    void rejectsNullDate() {
+        assertThrows(IllegalArgumentException.class, () -> new JournalEntry(
+                "test-key", null, "Test entry", balancedPostings()));
+    }
+
+    @Test
+    void rejectsBlankDescription() {
+        assertThrows(IllegalArgumentException.class, () -> new JournalEntry(
+                "test-key", LocalDate.of(2026, 10, 17), "  ", balancedPostings()));
+    }
+
 }
