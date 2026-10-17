@@ -5,17 +5,17 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PostingTest {
 
-    
+    private static final long CUSTOMER_ALICE = 2L;
 
     @Test
     void rejectsZeroAmount() {
         assertThrows(IllegalArgumentException.class,
-                () -> new Posting("customer-alice", Direction.DEBIT, 0));
+                () -> new Posting(CUSTOMER_ALICE, Direction.DEBIT, 0));
     }
 
     @Test
     void rejectsNegativeAmount() {
         assertThrows(IllegalArgumentException.class,
-                () -> new Posting("customer-alice", Direction.DEBIT, -500));
+                () -> new Posting(CUSTOMER_ALICE, Direction.DEBIT, -500));
     }
 }

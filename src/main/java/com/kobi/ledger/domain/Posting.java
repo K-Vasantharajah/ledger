@@ -1,6 +1,6 @@
 package com.kobi.ledger.domain;
 
-public record Posting(String accountId, Direction direction, long amountPence) {
+public record Posting(long accountId, Direction direction, long amountPence) {
     public Posting {
 
         if (amountPence <= 0) {
