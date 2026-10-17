@@ -1,10 +1,25 @@
 package com.kobi.ledger.domain;
 
 import java.util.List;
+import java.time.LocalDate;
 
-public record JournalEntry(List<Posting> postings) {
+public record JournalEntry(String idempotencyKey, LocalDate effectiveDate, String description, List<Posting> postings) {
+
     public JournalEntry {
-        if (postings.size() < 2) {
+
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException("Idempotency key must not be blank");
+        }
+
+        if (effectiveDate == null) {
+            throw new IllegalArgumentException("Effective date must not be null");
+        }
+
+        if (description == null || description.isBlank()) {
+            throw new IllegalArgumentException("Description must not be blank");
+        }
+
+        if (postings == null || postings.size() < 2) {
             throw new IllegalArgumentException("Journal entry must contain at least two postings");
         }
 
