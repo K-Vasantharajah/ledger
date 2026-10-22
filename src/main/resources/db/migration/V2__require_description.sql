@@ -1,0 +1,1 @@
+ALTER TABLE journal_entries ALTER COLUMN description SET NOT NULL;
