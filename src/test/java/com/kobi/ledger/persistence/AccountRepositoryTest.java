@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DuplicateKeyException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -33,6 +34,14 @@ class AccountRepositoryTest {
         var found = repository.findById(999_999L);
 
         assertTrue(found.isEmpty());
+    }
+
+    @Test
+    void rejectsDuplicateAccountName() {
+        var account = new Account("customer:bob:gbp", AccountType.LIABILITY, "GBP");
+        repository.create(account);
+
+        assertThrows(DuplicateKeyException.class, () -> repository.create(account));
     }
 
 }
