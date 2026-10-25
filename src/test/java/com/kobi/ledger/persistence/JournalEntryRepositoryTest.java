@@ -46,4 +46,22 @@ class JournalEntryRepositoryTest {
                 .single();
         assertEquals(0, count); // the entry row must be gone too
     }
+
+    @Test
+    void savesEntryWithAllPostings() {
+        long david = accounts.create(new Account("customer:david:gbp", AccountType.LIABILITY, "GBP"));
+        long charlotte  = accounts.create(new Account("customer:charlotte:gbp", AccountType.LIABILITY, "GBP"));
+
+        var entry = new JournalEntry("save-entry-test", LocalDate.of(2026, 10, 25), "Should survive",
+                List.of(new Posting(david, Direction.DEBIT, 10_000),
+                        new Posting(charlotte , Direction.CREDIT, 10_000)));
+
+        long entryId = repository.save(entry);
+
+        long count = jdbc.sql("SELECT COUNT(*) FROM postings WHERE journal_entry_id = :id")
+                .param("id", entryId)
+                .query(Long.class)
+                .single();
+        assertEquals(2, count);
+    }
 }
