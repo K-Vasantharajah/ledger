@@ -50,11 +50,11 @@ class JournalEntryRepositoryTest {
     @Test
     void savesEntryWithAllPostings() {
         long david = accounts.create(new Account("customer:david:gbp", AccountType.LIABILITY, "GBP"));
-        long charlotte  = accounts.create(new Account("customer:charlotte:gbp", AccountType.LIABILITY, "GBP"));
+        long charlotte = accounts.create(new Account("customer:charlotte:gbp", AccountType.LIABILITY, "GBP"));
 
         var entry = new JournalEntry("save-entry-test", LocalDate.of(2026, 10, 25), "Should survive",
                 List.of(new Posting(david, Direction.DEBIT, 10_000),
-                        new Posting(charlotte , Direction.CREDIT, 10_000)));
+                        new Posting(charlotte, Direction.CREDIT, 10_000)));
 
         long entryId = repository.save(entry);
 
@@ -63,5 +63,28 @@ class JournalEntryRepositoryTest {
                 .query(Long.class)
                 .single();
         assertEquals(2, count);
+    }
+
+    @Test
+    void readsBackSavedEntry() {
+        long erin = accounts.create(new Account("customer:erin:gbp", AccountType.LIABILITY, "GBP"));
+        long frank = accounts.create(new Account("customer:frank:gbp", AccountType.LIABILITY, "GBP"));
+
+        var entry = new JournalEntry("reads-back-saved-entry-test", LocalDate.of(2026, 10, 25), "Erin pays Frank",
+                List.of(new Posting(erin, Direction.DEBIT, 10_000),
+                        new Posting(frank, Direction.CREDIT, 10_000)));
+
+        long id = repository.save(entry);
+        var found = repository.findById(id);
+
+        assertTrue(found.isPresent());
+        assertEquals(entry, found.get());
+    }
+    
+    @Test
+    void returnsEmptyForUnknownEntryId() {
+        var found = repository.findById(999_999L);
+
+        assertTrue(found.isEmpty());
     }
 }
