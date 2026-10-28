@@ -43,4 +43,20 @@ public class AccountRepository {
                         rs.getString("currency")))
                 .optional();
     }
+
+    public Optional<Long> balance(long accountId) {
+        return jdbc.sql("""
+                SELECT a.type,
+                       COALESCE(SUM(p.amount_pence) FILTER (WHERE p.direction = 'DEBIT'), 0)  AS debits,
+                       COALESCE(SUM(p.amount_pence) FILTER (WHERE p.direction = 'CREDIT'), 0) AS credits
+                FROM accounts a
+                LEFT JOIN postings p ON p.account_id = a.id
+                WHERE a.id = :id
+                GROUP BY a.type
+                """)
+                .param("id", accountId)
+                .query((rs, rowNum) -> AccountType.valueOf(rs.getString("type"))
+                        .balance(rs.getLong("debits"), rs.getLong("credits")))
+                .optional();
+    }
 }
