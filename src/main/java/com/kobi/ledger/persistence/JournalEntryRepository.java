@@ -76,4 +76,15 @@ public class JournalEntryRepository {
                         postings))
                 .optional();
     }
+
+    public Optional<Long> findIdByIdempotencyKey(String key) {
+        return jdbc.sql("""
+                SELECT id
+                FROM journal_entries
+                WHERE idempotency_key = :key
+                """)
+                .param("key", key)
+                .query(Long.class)
+                .optional();
+    }
 }

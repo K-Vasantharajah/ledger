@@ -80,11 +80,32 @@ class JournalEntryRepositoryTest {
         assertTrue(found.isPresent());
         assertEquals(entry, found.get());
     }
-    
+
     @Test
     void returnsEmptyForUnknownEntryId() {
         var found = repository.findById(999_999L);
 
         assertTrue(found.isEmpty());
+    }
+
+    @Test
+    void findsIdByIdempotencyKey() {
+        long grace = accounts.create(new Account("customer:grace:gbp", AccountType.LIABILITY, "GBP"));
+        long henry = accounts.create(new Account("customer:henry:gbp", AccountType.LIABILITY, "GBP"));
+
+        var entry = new JournalEntry("find-by-key-test", LocalDate.of(2026, 10, 25), "Grace pays Henry",
+                List.of(new Posting(grace, Direction.DEBIT, 10_000),
+                        new Posting(henry, Direction.CREDIT, 10_000)));
+
+        long savedId = repository.save(entry);
+        var foundId = repository.findIdByIdempotencyKey("find-by-key-test");
+
+        assertEquals(savedId, foundId.orElseThrow());
+    }
+
+    @Test
+    void returnsEmptyForUnknownIdempotencyKey() {
+        var foundId = repository.findIdByIdempotencyKey("unknown-key");
+        assertTrue(foundId.isEmpty());
     }
 }
