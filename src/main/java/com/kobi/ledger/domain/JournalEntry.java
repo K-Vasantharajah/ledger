@@ -41,4 +41,14 @@ public record JournalEntry(String idempotencyKey, LocalDate effectiveDate, Strin
 
         postings = List.copyOf(postings);
     }
+
+    public JournalEntry reversal(String idempotencyKey, LocalDate effectiveDate) {
+        List<Posting> reversedPostings = postings.stream()
+                .map(posting -> new Posting(
+                        posting.accountId(),
+                        posting.direction().opposite(),
+                        posting.amountPence()))
+                .toList();
+        return new JournalEntry(idempotencyKey, effectiveDate, "Reversal of: " + description, reversedPostings);
+    }
 }

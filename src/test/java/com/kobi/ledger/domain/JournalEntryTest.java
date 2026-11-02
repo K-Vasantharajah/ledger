@@ -65,4 +65,23 @@ class JournalEntryTest {
                 "test-key", LocalDate.of(2026, 10, 17), "  ", balancedPostings()));
     }
 
+    @Test
+    void reversalFlipsEveryPosting() {
+        var entry = entryWith(balancedPostings());
+        var reversed = entry.reversal("reversed-key", LocalDate.of(2026, 10, 18));
+        assertEquals(List.of(
+                new Posting(SAFEGUARDING_BANK, Direction.CREDIT, 10_000),
+                new Posting(CUSTOMER_ALICE, Direction.DEBIT, 10_000)),
+                reversed.postings());
+    }
+
+    @Test
+    void reversalUsesNewKeyDateAndDescription() {
+        var entry = entryWith(balancedPostings());
+        var reversed = entry.reversal("reversed-key", LocalDate.of(2026, 10, 18));
+        assertEquals("reversed-key", reversed.idempotencyKey());
+        assertEquals(LocalDate.of(2026, 10, 18), reversed.effectiveDate());
+        assertEquals("Reversal of: Test entry", reversed.description());
+    }
+
 }
