@@ -1,0 +1,1 @@
+ALTER TABLE journal_entries ADD COLUMN reversal_of_id BIGINT UNIQUE REFERENCES journal_entries(id);
