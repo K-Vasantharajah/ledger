@@ -22,33 +22,6 @@ public class JournalEntryRepository {
         this.jdbc = jdbc;
     }
 
-    @Transactional
-    public long save(JournalEntry entry) {
-        var keyHolder = new GeneratedKeyHolder();
-        jdbc.sql("""
-                INSERT INTO journal_entries (idempotency_key, effective_date, description)
-                VALUES (:key, :date, :description)
-                """)
-                .param("key", entry.idempotencyKey())
-                .param("date", entry.effectiveDate())
-                .param("description", entry.description())
-                .update(keyHolder, "id");
-        long entryId = keyHolder.getKey().longValue();
-
-        for (Posting posting : entry.postings()) {
-            jdbc.sql("""
-                    INSERT INTO postings (journal_entry_id, account_id, direction, amount_pence)
-                    VALUES (:entryId, :accountId, :direction, :amount)
-                    """)
-                    .param("entryId", entryId)
-                    .param("accountId", posting.accountId())
-                    .param("direction", posting.direction().name())
-                    .param("amount", posting.amountPence())
-                    .update();
-        }
-        return entryId;
-    }
-
     public Optional<JournalEntry> findById(long id) {
         List<Posting> postings = jdbc.sql("""
                 SELECT account_id, direction, amount_pence
@@ -86,5 +59,42 @@ public class JournalEntryRepository {
                 .param("key", key)
                 .query(Long.class)
                 .optional();
+    }
+
+    @Transactional
+    public long save(JournalEntry entry) {
+        return insert(entry, null);
+    }
+
+    @Transactional
+    public long saveReversal(JournalEntry reversal, long originalId) {
+        return insert(reversal, originalId);
+    }
+
+    private long insert(JournalEntry entry, Long reversalOfId) {
+        var keyHolder = new GeneratedKeyHolder();
+        jdbc.sql("""
+                INSERT INTO journal_entries (idempotency_key, effective_date, description, reversal_of_id)
+                VALUES (:key, :date, :description, :reversalOfId)
+                """)
+                .param("key", entry.idempotencyKey())
+                .param("date", entry.effectiveDate())
+                .param("description", entry.description())
+                .param("reversalOfId", reversalOfId)
+                .update(keyHolder, "id");
+        long entryId = keyHolder.getKey().longValue();
+
+        for (Posting posting : entry.postings()) {
+            jdbc.sql("""
+                    INSERT INTO postings (journal_entry_id, account_id, direction, amount_pence)
+                    VALUES (:entryId, :accountId, :direction, :amount)
+                    """)
+                    .param("entryId", entryId)
+                    .param("accountId", posting.accountId())
+                    .param("direction", posting.direction().name())
+                    .param("amount", posting.amountPence())
+                    .update();
+        }
+        return entryId;
     }
 }
