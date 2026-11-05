@@ -3,6 +3,9 @@ package com.kobi.ledger.service;
 import com.kobi.ledger.domain.JournalEntry;
 import com.kobi.ledger.persistence.JournalEntryRepository;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+
 import org.springframework.dao.DuplicateKeyException;
 
 @Service
@@ -33,5 +36,12 @@ public class LedgerService {
             return existingId;
         }
         throw new IdempotencyConflictException(entry.idempotencyKey());
+    }
+
+    public long reverse(long originalId, String idempotencyKey, LocalDate effectiveDate) {
+        var original = entries.findById(originalId)
+                .orElseThrow(() -> new IllegalArgumentException("No journal entry with id " + originalId));
+        var reversal = original.reversal(idempotencyKey, effectiveDate);
+        return entries.saveReversal(reversal, originalId);
     }
 }

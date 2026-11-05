@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 import com.kobi.ledger.TestcontainersConfiguration;
@@ -89,5 +90,37 @@ class LedgerServiceTest {
                         new Posting(noah, Direction.CREDIT, 5_000)));
 
         assertThrows(IdempotencyConflictException.class, () -> ledger.post(conflictingEntry));
+    }
+
+    @Test
+    void reversalBringsBalancesBackToZero() {
+        long olivia = accounts.create(new Account("customer:olivia:gbp", AccountType.LIABILITY, "GBP"));
+        long paul = accounts.create(new Account("customer:paul:gbp", AccountType.LIABILITY, "GBP"));
+
+        var payment = new JournalEntry("service-reversal-test", LocalDate.of(2026, 11, 5), "Olivia pays Paul £100",
+                List.of(new Posting(olivia, Direction.DEBIT, 10_000),
+                        new Posting(paul, Direction.CREDIT, 10_000)));
+        long paymentId = ledger.post(payment);
+
+        ledger.reverse(paymentId, "service-reversal-test-undo", LocalDate.of(2026, 11, 5));
+
+        assertEquals(0, accounts.balance(olivia).orElseThrow());
+        assertEquals(0, accounts.balance(paul).orElseThrow());
+    }
+
+    @Test
+    void rejectsReversingSameEntryTwice() {
+        long quinn = accounts.create(new Account("customer:quinn:gbp", AccountType.LIABILITY, "GBP"));
+        long ryan = accounts.create(new Account("customer:ryan:gbp", AccountType.LIABILITY, "GBP"));
+
+        var payment = new JournalEntry("service-reversal-twice-test", LocalDate.of(2026, 11, 6), "Quinn pays Ryan £100",
+                List.of(new Posting(quinn, Direction.DEBIT, 10_000),
+                        new Posting(ryan, Direction.CREDIT, 10_000)));
+        long paymentId = ledger.post(payment);
+
+        ledger.reverse(paymentId, "service-reversal-twice-test-undo", LocalDate.of(2026, 11, 6));
+
+        assertThrows(DuplicateKeyException.class,
+                () -> ledger.reverse(paymentId, "service-reversal-twice-test-undo-again", LocalDate.of(2026, 11, 6)));
     }
 }
