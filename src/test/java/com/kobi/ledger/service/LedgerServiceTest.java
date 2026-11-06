@@ -123,4 +123,10 @@ class LedgerServiceTest {
         assertThrows(DuplicateKeyException.class,
                 () -> ledger.reverse(paymentId, "service-reversal-twice-test-undo-again", LocalDate.of(2026, 11, 6)));
     }
+
+    @Test
+    void rejectsReversingUnknownEntry() {
+        assertThrows(IllegalArgumentException.class,
+                () -> ledger.reverse(999_999L, "service-reversal-unknown-test", LocalDate.of(2026, 11, 7)));
+    }
 }
