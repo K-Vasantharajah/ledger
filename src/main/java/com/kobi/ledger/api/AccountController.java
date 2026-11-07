@@ -1,10 +1,13 @@
 package com.kobi.ledger.api;
 
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
 import com.kobi.ledger.domain.Account;
@@ -26,5 +29,12 @@ public class AccountController {
         var account = new Account(request.name(), request.type(), request.currency());
         long id = accounts.create(account);
         return new IdResponse(id);
+    }
+
+    @GetMapping("/{id}/balance")
+    public BalanceResponse balance(@PathVariable long id) {
+        long balancePence = accounts.balance(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No account with id " + id));
+        return new BalanceResponse(balancePence);
     }
 }
