@@ -1,6 +1,7 @@
 package com.kobi.ledger.domain;
 
 import java.util.List;
+import java.util.stream.Stream;
 import java.time.LocalDate;
 
 public record JournalEntry(String idempotencyKey, LocalDate effectiveDate, String description, List<Posting> postings) {
