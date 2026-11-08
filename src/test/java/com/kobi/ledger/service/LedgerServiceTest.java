@@ -126,7 +126,7 @@ class LedgerServiceTest {
 
     @Test
     void rejectsReversingUnknownEntry() {
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(EntryNotFoundException.class,
                 () -> ledger.reverse(999_999L, "service-reversal-unknown-test", LocalDate.of(2026, 11, 7)));
     }
 }

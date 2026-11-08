@@ -1,5 +1,6 @@
 package com.kobi.ledger.api;
 
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -34,5 +35,14 @@ public class JournalEntryController {
         var entry = new JournalEntry(idempotencyKey, request.effectiveDate(), request.description(), postings);
 
         return new IdResponse(ledger.post(entry));
+    }
+
+    @PostMapping("/{id}/reversal")
+    @ResponseStatus(HttpStatus.CREATED)
+    public IdResponse reverse(@PathVariable long id,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestBody ReverseEntryRequest request) {
+        long reversalId = ledger.reverse(id, idempotencyKey, request.effectiveDate());
+        return new IdResponse(reversalId);
     }
 }

@@ -40,7 +40,7 @@ public class LedgerService {
 
     public long reverse(long originalId, String idempotencyKey, LocalDate effectiveDate) {
         var original = entries.findById(originalId)
-                .orElseThrow(() -> new IllegalArgumentException("No journal entry with id " + originalId));
+                .orElseThrow(() -> new EntryNotFoundException(originalId));
         var reversal = original.reversal(idempotencyKey, effectiveDate);
         return entries.saveReversal(reversal, originalId);
     }
