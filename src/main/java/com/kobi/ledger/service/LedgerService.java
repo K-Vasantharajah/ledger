@@ -42,6 +42,19 @@ public class LedgerService {
         var original = entries.findById(originalId)
                 .orElseThrow(() -> new EntryNotFoundException(originalId));
         var reversal = original.reversal(idempotencyKey, effectiveDate);
-        return entries.saveReversal(reversal, originalId);
+
+        var foundId = entries.findIdByIdempotencyKey(idempotencyKey);
+        if (foundId.isPresent()) {
+            return matchExisting(foundId.get(), reversal);
+        }
+        try {
+            return entries.saveReversal(reversal, originalId);
+        } catch (DuplicateKeyException e) {
+            var raceWinner = entries.findIdByIdempotencyKey(idempotencyKey);
+            if (raceWinner.isPresent()) {
+                return matchExisting(raceWinner.get(), reversal);
+            }
+            throw new AlreadyReversedException(originalId);
+        }
     }
 }

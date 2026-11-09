@@ -120,7 +120,7 @@ class LedgerServiceTest {
 
         ledger.reverse(paymentId, "service-reversal-twice-test-undo", LocalDate.of(2026, 11, 6));
 
-        assertThrows(DuplicateKeyException.class,
+        assertThrows(AlreadyReversedException.class,
                 () -> ledger.reverse(paymentId, "service-reversal-twice-test-undo-again", LocalDate.of(2026, 11, 6)));
     }
 
@@ -128,5 +128,22 @@ class LedgerServiceTest {
     void rejectsReversingUnknownEntry() {
         assertThrows(EntryNotFoundException.class,
                 () -> ledger.reverse(999_999L, "service-reversal-unknown-test", LocalDate.of(2026, 11, 7)));
+    }
+
+    @Test
+    void retryingSameReversalReturnsSameId() {
+        long sophia = accounts.create(new Account("customer:sophia:gbp", AccountType.LIABILITY, "GBP"));
+        long theo = accounts.create(new Account("customer:theo:gbp", AccountType.LIABILITY, "GBP"));
+
+        var payment = new JournalEntry("service-reversal-retry-test", LocalDate.of(2026, 11, 9),
+                "Sophia pays Theo £100",
+                List.of(new Posting(sophia, Direction.DEBIT, 10_000),
+                        new Posting(theo, Direction.CREDIT, 10_000)));
+        long paymentId = ledger.post(payment);
+
+        long firstId = ledger.reverse(paymentId, "service-reversal-retry-test-undo", LocalDate.of(2026, 11, 9));
+        long retryId = ledger.reverse(paymentId, "service-reversal-retry-test-undo", LocalDate.of(2026, 11, 9));
+
+        assertEquals(firstId, retryId);
     }
 }

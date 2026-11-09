@@ -5,6 +5,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.kobi.ledger.service.AlreadyReversedException;
 import com.kobi.ledger.service.EntryNotFoundException;
 import com.kobi.ledger.service.IdempotencyConflictException;
 
@@ -24,5 +25,10 @@ public class ApiExceptionHandler {
     @ExceptionHandler(EntryNotFoundException.class)
     public ProblemDetail handleEntryNotFound(EntryNotFoundException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(AlreadyReversedException.class)
+    public ProblemDetail handleAlreadyReversed(AlreadyReversedException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
     }
 }
