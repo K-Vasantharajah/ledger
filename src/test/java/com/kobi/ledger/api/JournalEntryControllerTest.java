@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -43,6 +44,25 @@ class JournalEntryControllerTest {
                   ]
                 }
                 """.formatted(debitAccount, amountPence, creditAccount, amountPence);
+    }
+
+    private long postEntry(String key, long debitAccount, long creditAccount, long amountPence) throws Exception {
+        var result = mvc.perform(post("/journal-entries")
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(entryJson(debitAccount, creditAccount, amountPence)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return ((Number) JsonPath.read(result.getResponse().getContentAsString(), "$.id")).longValue();
+    }
+
+    private ResultActions reverse(long entryId, String key) throws Exception {
+        return mvc.perform(post("/journal-entries/{id}/reversal", entryId)
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        { "effectiveDate": "2026-11-11" }
+                        """));
     }
 
     @Test
@@ -136,5 +156,32 @@ class JournalEntryControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(entryJson(ian, jill, 10_000)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void reversesEntryAndReturnsCreated() throws Exception {
+        long payer = accounts.create(new Account("api-reverse-entry:payer", AccountType.LIABILITY, "GBP"));
+        long payee = accounts.create(new Account("api-reverse-entry:payee", AccountType.LIABILITY, "GBP"));
+        long entryId = postEntry("api-reverse-entry", payer, payee, 10_000);
+
+        reverse(entryId, "api-reverse-entry-undo")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber());
+    }
+
+    @Test
+    void returnsNotFoundWhenReversingUnknownEntry() throws Exception {
+        reverse(999_999L, "api-reverse-unknown-undo")
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void returnsConflictWhenReversingTwice() throws Exception {
+        long payer = accounts.create(new Account("api-reverse-twice:payer", AccountType.LIABILITY, "GBP"));
+        long payee = accounts.create(new Account("api-reverse-twice:payee", AccountType.LIABILITY, "GBP"));
+        long entryId = postEntry("api-reverse-twice", payer, payee, 10_000);
+
+        reverse(entryId, "api-reverse-twice-undo").andExpect(status().isCreated());
+        reverse(entryId, "api-reverse-twice-undo-again").andExpect(status().isConflict());
     }
 }
