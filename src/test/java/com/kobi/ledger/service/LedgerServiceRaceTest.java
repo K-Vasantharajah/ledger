@@ -1,8 +1,11 @@
 package com.kobi.ledger.service;
 
+import com.kobi.ledger.domain.Account;
+import com.kobi.ledger.domain.AccountType;
 import com.kobi.ledger.domain.Direction;
 import com.kobi.ledger.domain.JournalEntry;
 import com.kobi.ledger.domain.Posting;
+import com.kobi.ledger.persistence.AccountRepository;
 import com.kobi.ledger.persistence.JournalEntryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
@@ -29,7 +32,11 @@ class LedgerServiceRaceTest {
         when(entries.save(entry)).thenThrow(new DuplicateKeyException("duplicate key"));
         when(entries.findById(42L)).thenReturn(Optional.of(entry));
 
-        var ledger = new LedgerService(entries);
+        var accounts = mock(AccountRepository.class);
+        when(accounts.findById(1L)).thenReturn(Optional.of(new Account("asset:race:one", AccountType.ASSET, "GBP")));
+        when(accounts.findById(2L)).thenReturn(Optional.of(new Account("asset:race:two", AccountType.ASSET, "GBP")));
+
+        var ledger = new LedgerService(entries, accounts);
 
         assertEquals(42L, ledger.post(entry));
     }
@@ -50,7 +57,11 @@ class LedgerServiceRaceTest {
         when(entries.save(entry)).thenThrow(new DuplicateKeyException("duplicate key"));
         when(entries.findById(42L)).thenReturn(Optional.of(winnersEntry));
 
-        var ledger = new LedgerService(entries);
+        var accounts = mock(AccountRepository.class);
+        when(accounts.findById(1L)).thenReturn(Optional.of(new Account("asset:race:one", AccountType.ASSET, "GBP")));
+        when(accounts.findById(2L)).thenReturn(Optional.of(new Account("asset:race:two", AccountType.ASSET, "GBP")));
+
+        var ledger = new LedgerService(entries, accounts);
 
         assertThrows(IdempotencyConflictException.class, () -> ledger.post(entry));
     }

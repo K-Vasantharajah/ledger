@@ -1,10 +1,15 @@
 package com.kobi.ledger.service;
 
+import com.kobi.ledger.domain.AccountType;
 import com.kobi.ledger.domain.JournalEntry;
+import com.kobi.ledger.domain.Posting;
+import com.kobi.ledger.persistence.AccountRepository;
 import com.kobi.ledger.persistence.JournalEntryRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.dao.DuplicateKeyException;
 
@@ -12,9 +17,11 @@ import org.springframework.dao.DuplicateKeyException;
 public class LedgerService {
 
     private final JournalEntryRepository entries;
+    private final AccountRepository accounts;
 
-    public LedgerService(JournalEntryRepository entries) {
+    public LedgerService(JournalEntryRepository entries, AccountRepository accounts) {
         this.entries = entries;
+        this.accounts = accounts;
     }
 
     public long post(JournalEntry entry) {
@@ -23,6 +30,7 @@ public class LedgerService {
             return matchExisting(foundId.get(), entry);
         }
         try {
+            checkNoOverdraft(entry);
             return entries.save(entry);
         } catch (DuplicateKeyException e) {
             long existingId = entries.findIdByIdempotencyKey(entry.idempotencyKey()).orElseThrow();
@@ -55,6 +63,24 @@ public class LedgerService {
                 return matchExisting(raceWinner.get(), reversal);
             }
             throw new AlreadyReversedException(originalId);
+        }
+    }
+
+    private void checkNoOverdraft(JournalEntry entry) {
+        Map<Long, Long> effects = new HashMap<>();
+        for (Posting posting : entry.postings()) {
+            var account = accounts.findById(posting.accountId())
+                    .orElseThrow(() -> new IllegalArgumentException("No account with id " + posting.accountId()));
+
+            if (account.type() == AccountType.LIABILITY) {
+                effects.merge(posting.accountId(), posting.effectOn(account.type()), Long::sum);
+            }
+        }
+        for (var e : effects.entrySet()) {
+            long currentBalance = accounts.balance(e.getKey()).orElseThrow();
+            if (currentBalance + e.getValue() < 0) {
+                throw new InsufficientFundsException(e.getKey(), currentBalance + e.getValue());
+            }
         }
     }
 }
