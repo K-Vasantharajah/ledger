@@ -14,11 +14,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.LocalDate;
+
 import static org.hamcrest.Matchers.containsString;
 
 import com.kobi.ledger.TestcontainersConfiguration;
 import com.kobi.ledger.domain.Account;
 import com.kobi.ledger.domain.AccountType;
+import com.kobi.ledger.domain.Direction;
+import com.kobi.ledger.domain.JournalEntry;
+import com.kobi.ledger.domain.Posting;
 import com.kobi.ledger.persistence.AccountRepository;
 import com.jayway.jsonpath.JsonPath;
 
@@ -65,10 +71,16 @@ class JournalEntryControllerTest {
                         """));
     }
 
+    private void fund(long customer, long amountPence, String key) throws Exception {
+        long bank = accounts.create(new Account(key + ":bank", AccountType.ASSET, "GBP"));
+        postEntry(key, bank, customer, amountPence);
+    }
+
     @Test
     void postsEntryAndReturnsCreated() throws Exception {
         long sara = accounts.create(new Account("customer:sara:gbp", AccountType.LIABILITY, "GBP"));
         long tom = accounts.create(new Account("customer:tom:gbp", AccountType.LIABILITY, "GBP"));
+        fund(sara, 10_000, "api-new-entry-test-topup");
 
         mvc.perform(post("/journal-entries")
                 .header("Idempotency-Key", "api-new-entry-test")
@@ -82,6 +94,7 @@ class JournalEntryControllerTest {
     void retryWithSameKeyReturnsSameId() throws Exception {
         long kim = accounts.create(new Account("customer:kim:gbp", AccountType.LIABILITY, "GBP"));
         long liam = accounts.create(new Account("customer:liam:gbp", AccountType.LIABILITY, "GBP"));
+        fund(kim, 10_000, "api-retry-entry-test-topup");
 
         var result1 = mvc.perform(post("/journal-entries")
                 .header("Idempotency-Key", "api-retry-entry-test")
@@ -109,6 +122,7 @@ class JournalEntryControllerTest {
     void returnsConflictForSameKeyWithDifferentEntry() throws Exception {
         long nina = accounts.create(new Account("customer:nina:gbp", AccountType.LIABILITY, "GBP"));
         long jake = accounts.create(new Account("customer:jake:gbp", AccountType.LIABILITY, "GBP"));
+        fund(nina, 10_000, "api-conflict-entry-test-topup");
 
         mvc.perform(post("/journal-entries")
                 .header("Idempotency-Key", "api-conflict-entry-test")
@@ -162,6 +176,8 @@ class JournalEntryControllerTest {
     void reversesEntryAndReturnsCreated() throws Exception {
         long payer = accounts.create(new Account("api-reverse-entry:payer", AccountType.LIABILITY, "GBP"));
         long payee = accounts.create(new Account("api-reverse-entry:payee", AccountType.LIABILITY, "GBP"));
+        fund(payer, 10_000, "api-reverse-entry-topup");
+
         long entryId = postEntry("api-reverse-entry", payer, payee, 10_000);
 
         reverse(entryId, "api-reverse-entry-undo")
@@ -179,6 +195,8 @@ class JournalEntryControllerTest {
     void returnsConflictWhenReversingTwice() throws Exception {
         long payer = accounts.create(new Account("api-reverse-twice:payer", AccountType.LIABILITY, "GBP"));
         long payee = accounts.create(new Account("api-reverse-twice:payee", AccountType.LIABILITY, "GBP"));
+        fund(payer, 10_000, "api-reverse-twice-topup");
+
         long entryId = postEntry("api-reverse-twice", payer, payee, 10_000);
 
         reverse(entryId, "api-reverse-twice-undo").andExpect(status().isCreated());
