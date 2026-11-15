@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.kobi.ledger.service.AlreadyReversedException;
 import com.kobi.ledger.service.EntryNotFoundException;
 import com.kobi.ledger.service.IdempotencyConflictException;
+import com.kobi.ledger.service.InsufficientFundsException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -30,5 +31,10 @@ public class ApiExceptionHandler {
     @ExceptionHandler(AlreadyReversedException.class)
     public ProblemDetail handleAlreadyReversed(AlreadyReversedException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(InsufficientFundsException.class)
+    public ProblemDetail handleInsufficientFunds(InsufficientFundsException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
     }
 }
