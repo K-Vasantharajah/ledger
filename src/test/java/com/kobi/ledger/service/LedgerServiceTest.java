@@ -165,4 +165,52 @@ class LedgerServiceTest {
 
         assertEquals(firstId, retryId);
     }
+
+    @Test
+    void rejectsPaymentThatWouldOverdraw() {
+        long uma = accounts.create(new Account("customer:uma:gbp", AccountType.LIABILITY, "GBP"));
+        long victor = accounts.create(new Account("customer:victor:gbp", AccountType.LIABILITY, "GBP"));
+        fund(uma, 5_000, "service-overdraw-test-topup");
+
+        var payment = new JournalEntry("service-overdraw-test", LocalDate.of(2026, 11, 10),
+                "Uma pays Victor £100",
+                List.of(new Posting(uma, Direction.DEBIT, 10_000),
+                        new Posting(victor, Direction.CREDIT, 10_000)));
+
+        assertThrows(InsufficientFundsException.class, () -> ledger.post(payment));
+        assertEquals(5_000, accounts.balance(uma).orElseThrow());
+        assertTrue(entries.findIdByIdempotencyKey("service-overdraw-test").isEmpty());
+    }
+
+    @Test
+    void allowsPaymentDownToExactlyZero() {
+        long wendy = accounts.create(new Account("customer:wendy:gbp", AccountType.LIABILITY, "GBP"));
+        long xavier = accounts.create(new Account("customer:xavier:gbp", AccountType.LIABILITY, "GBP"));
+        fund(wendy, 10_000, "service-exact-zero-test-topup");
+
+        var payment = new JournalEntry("service-exact-zero-test", LocalDate.of(2026, 11, 11),
+                "Wendy pays Xavier £100",
+                List.of(new Posting(wendy, Direction.DEBIT, 10_000),
+                        new Posting(xavier, Direction.CREDIT, 10_000)));
+
+        assertDoesNotThrow(() -> ledger.post(payment));
+        assertEquals(0, accounts.balance(wendy).orElseThrow());
+        assertEquals(10_000, accounts.balance(xavier).orElseThrow());
+    }
+
+    @Test
+    void checksCombinedEffectOfPostingsOnSameAccount() {
+        long yasmine = accounts.create(new Account("customer:yasmine:gbp", AccountType.LIABILITY, "GBP"));
+        long zane = accounts.create(new Account("customer:zane:gbp", AccountType.LIABILITY, "GBP"));
+        fund(yasmine, 10_000, "service-combined-postings-test-topup");
+
+        var payment = new JournalEntry("service-combined-postings-test", LocalDate.of(2026, 11, 12),
+                "Yasmine pays Zane £110 in two parts",
+                List.of(new Posting(yasmine, Direction.DEBIT, 6_000),
+                        new Posting(yasmine, Direction.DEBIT, 5_000),
+                        new Posting(zane, Direction.CREDIT, 11_000)));
+
+        assertThrows(InsufficientFundsException.class, () -> ledger.post(payment));
+        assertEquals(10_000, accounts.balance(yasmine).orElseThrow());
+    }
 }
