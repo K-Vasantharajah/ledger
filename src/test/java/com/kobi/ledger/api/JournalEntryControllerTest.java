@@ -202,4 +202,18 @@ class JournalEntryControllerTest {
         reverse(entryId, "api-reverse-twice-undo").andExpect(status().isCreated());
         reverse(entryId, "api-reverse-twice-undo-again").andExpect(status().isConflict());
     }
+
+    @Test
+    void returnsUnprocessableForInsufficientFunds() throws Exception {
+        long poor = accounts.create(new Account("api-insufficient-funds:poor", AccountType.LIABILITY, "GBP"));
+        long rich = accounts.create(new Account("api-insufficient-funds:rich", AccountType.LIABILITY, "GBP"));
+        fund(poor, 5_000, "api-insufficient-funds-topup");
+
+        mvc.perform(post("/journal-entries")
+                .header("Idempotency-Key", "api-insufficient-funds-test")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(entryJson(poor, rich, 10_000)))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.detail").value(containsString("would go to")));
+    }
 }
