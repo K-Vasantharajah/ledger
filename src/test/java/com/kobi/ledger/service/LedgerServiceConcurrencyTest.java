@@ -86,4 +86,43 @@ class LedgerServiceConcurrencyTest {
         assertTrue(balance >= 0, "Payer overdrawn: " + balance);
         assertEquals(10_000 - succeeded * 3_000, balance);
     }
+
+    @Test
+    void oppositeTransfersDoNotDeadlock() throws Exception {
+        long alice = accounts.create(new Account("service-race-deadlock:alice", AccountType.LIABILITY, "GBP"));
+        long bob = accounts.create(new Account("service-race-deadlock:bob", AccountType.LIABILITY, "GBP"));
+        fund(alice, 100_000, "service-race-deadlock-topup-alice");
+        fund(bob, 100_000, "service-race-deadlock-topup-bob");
+
+        int attempts = 20;
+        var start = new CountDownLatch(1);
+        var pool = Executors.newFixedThreadPool(attempts);
+        var results = new ArrayList<Future<Long>>();
+
+        for (int i = 0; i < attempts; i++) {
+            long from = (i % 2 == 0) ? alice : bob;
+            long to = (i % 2 == 0) ? bob : alice;
+
+            var payment = new JournalEntry("service-race-deadlock-" + i, LocalDate.of(2026, 11, 15),
+                    "Transfer attempt " + i,
+                    List.of(new Posting(from, Direction.DEBIT, 1_000),
+                            new Posting(to, Direction.CREDIT, 1_000)));
+
+            results.add(pool.submit(() -> {
+                start.await();
+                return ledger.post(payment); // returns the entry id; any exception fails the test via get()
+            }));
+        }
+
+        start.countDown(); // release all threads at once
+        for (var result : results) {
+            result.get(); // // re-throws any exception from the task
+        }
+        pool.shutdown();
+
+        long balanceAlice = accounts.balance(alice).orElseThrow();
+        long balanceBob = accounts.balance(bob).orElseThrow();
+        assertEquals(100_000, balanceAlice);
+        assertEquals(100_000, balanceBob);
+    }
 }
