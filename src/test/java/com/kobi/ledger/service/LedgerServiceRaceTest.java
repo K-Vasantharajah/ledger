@@ -9,6 +9,8 @@ import com.kobi.ledger.persistence.AccountRepository;
 import com.kobi.ledger.persistence.JournalEntryRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -36,7 +38,8 @@ class LedgerServiceRaceTest {
         when(accounts.findById(1L)).thenReturn(Optional.of(new Account("asset:race:one", AccountType.ASSET, "GBP")));
         when(accounts.findById(2L)).thenReturn(Optional.of(new Account("asset:race:two", AccountType.ASSET, "GBP")));
 
-        var ledger = new LedgerService(entries, accounts);
+        var ledger = new LedgerService(entries, accounts,
+                new TransactionTemplate(mock(PlatformTransactionManager.class)));
 
         assertEquals(42L, ledger.post(entry));
     }
@@ -61,7 +64,8 @@ class LedgerServiceRaceTest {
         when(accounts.findById(1L)).thenReturn(Optional.of(new Account("asset:race:one", AccountType.ASSET, "GBP")));
         when(accounts.findById(2L)).thenReturn(Optional.of(new Account("asset:race:two", AccountType.ASSET, "GBP")));
 
-        var ledger = new LedgerService(entries, accounts);
+        var ledger = new LedgerService(entries, accounts,
+                new TransactionTemplate(mock(PlatformTransactionManager.class)));
 
         assertThrows(IdempotencyConflictException.class, () -> ledger.post(entry));
     }

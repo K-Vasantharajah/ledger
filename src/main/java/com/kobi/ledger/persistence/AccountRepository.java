@@ -59,4 +59,16 @@ public class AccountRepository {
                         .balance(rs.getLong("debits"), rs.getLong("credits")))
                 .optional();
     }
+
+    public void lockForUpdate(long accountId) {
+        jdbc.sql("""
+                SELECT id
+                FROM accounts
+                WHERE id = :id
+                FOR UPDATE
+                """)
+                .param("id", accountId)
+                .query(Long.class)
+                .single();
+    }
 }

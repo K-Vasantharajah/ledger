@@ -6,6 +6,7 @@ import com.kobi.ledger.domain.Posting;
 import com.kobi.ledger.persistence.AccountRepository;
 import com.kobi.ledger.persistence.JournalEntryRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -18,10 +19,12 @@ public class LedgerService {
 
     private final JournalEntryRepository entries;
     private final AccountRepository accounts;
+    private final TransactionTemplate tx;
 
-    public LedgerService(JournalEntryRepository entries, AccountRepository accounts) {
+    public LedgerService(JournalEntryRepository entries, AccountRepository accounts, TransactionTemplate tx) {
         this.entries = entries;
         this.accounts = accounts;
+        this.tx = tx;
     }
 
     public long post(JournalEntry entry) {
@@ -30,8 +33,10 @@ public class LedgerService {
             return matchExisting(foundId.get(), entry);
         }
         try {
-            checkNoOverdraft(entry);
-            return entries.save(entry);
+            return tx.execute(status -> {
+                checkNoOverdraft(entry);
+                return entries.save(entry);
+            });
         } catch (DuplicateKeyException e) {
             long existingId = entries.findIdByIdempotencyKey(entry.idempotencyKey()).orElseThrow();
             return matchExisting(existingId, entry);
@@ -76,10 +81,14 @@ public class LedgerService {
                 effects.merge(posting.accountId(), posting.effectOn(account.type()), Long::sum);
             }
         }
-        for (var e : effects.entrySet()) {
-            long currentBalance = accounts.balance(e.getKey()).orElseThrow();
-            if (currentBalance + e.getValue() < 0) {
-                throw new InsufficientFundsException(e.getKey(), currentBalance + e.getValue());
+        var accountIds = effects.keySet().stream().sorted().toList();
+        for (long id : accountIds) {
+            accounts.lockForUpdate(id);
+        }
+        for (long id : accountIds) {
+            long projected = accounts.balance(id).orElseThrow() + effects.get(id);
+            if (projected < 0) {
+                throw new InsufficientFundsException(id, projected);
             }
         }
     }
