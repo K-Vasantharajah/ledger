@@ -16,6 +16,9 @@ history is append-only, and the API is safe to retry.
   can be reversed at most once
 - **Balances** calculated from postings, respecting each account type's normal balance
 - **Errors** returned as RFC 9457 problem details with meaningful status codes
+- **No overdrafts, even under concurrency:** a payment that would take a customer
+  wallet below zero is rejected (`422`). Concurrent payments are serialised with
+  row locks, so they can't all spend the same balance.
 
 ## Tech stack
 
@@ -67,6 +70,12 @@ Content-Type: application/json
 - **Rules live in the domain, backed up by the database.** Pure Java classes enforce
   the invariants, and Postgres constraints (`CHECK`, `UNIQUE`, foreign keys) back
   them up, so a bug in application code still can't corrupt the books.
+- **Pessimistic row locks for the overdraft check.** Checking a balance and then
+  saving is a check-then-act race: ten concurrent £30 payments from a £100 wallet all
+  succeeded before the fix. Now the check and the save share one transaction, which
+  locks the customer accounts with `SELECT ... FOR UPDATE`, always in ascending id
+  order to avoid deadlocks. Only customer accounts are locked, so busy accounts like
+  the bank aren't a bottleneck.
 
 ## Running the tests
 
@@ -82,5 +91,5 @@ from the Flyway migrations on every run.
 ## Roadmap
 
 - [x] Milestone 1: single-currency ledger core, idempotent API, reversals, CI
-- [ ] Milestone 2: concurrency (a no-overdraft rule under simultaneous spends)
+- [x] Milestone 2: concurrency (a no-overdraft rule under simultaneous spends)
 - [ ] Milestone 3: reconciliation against external bank statements
