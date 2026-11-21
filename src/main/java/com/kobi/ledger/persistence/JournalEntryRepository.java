@@ -97,4 +97,11 @@ public class JournalEntryRepository {
         }
         return entryId;
     }
+
+    public boolean isReversed(long entryId) {
+        return jdbc.sql("SELECT EXISTS (SELECT 1 FROM journal_entries WHERE reversal_of_id = :id)")
+                .param("id", entryId)
+                .query(Boolean.class)
+                .single();
+    }
 }

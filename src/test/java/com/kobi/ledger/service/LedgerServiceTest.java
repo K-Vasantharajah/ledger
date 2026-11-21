@@ -213,4 +213,29 @@ class LedgerServiceTest {
         assertThrows(InsufficientFundsException.class, () -> ledger.post(payment));
         assertEquals(10_000, accounts.balance(yasmine).orElseThrow());
     }
+
+    @Test
+    void rejectsReversalThatWouldOverdraw() {
+        long alice = accounts.create(new Account("service-reversal-overdraw:alice", AccountType.LIABILITY, "GBP"));
+        long bob = accounts.create(new Account("service-reversal-overdraw:bob", AccountType.LIABILITY, "GBP"));
+        fund(alice, 10_000, "service-reversal-overdraw-topup");
+
+        var payment = new JournalEntry("service-reversal-overdraw-payment", LocalDate.of(2026, 11, 13),
+                "Alice pays Bob £100",
+                List.of(new Posting(alice, Direction.DEBIT, 10_000),
+                        new Posting(bob, Direction.CREDIT, 10_000)));
+        long paymentId = ledger.post(payment);
+
+        var bobSpends = new JournalEntry("service-reversal-overdraw-bob-spends", LocalDate.of(2026, 11, 14),
+                "Bob pays Alice £50",
+                List.of(new Posting(bob, Direction.DEBIT, 5_000),
+                        new Posting(alice, Direction.CREDIT, 5_000)));
+        ledger.post(bobSpends);
+
+        assertThrows(InsufficientFundsException.class,
+                () -> ledger.reverse(paymentId, "service-reversal-overdraw-undo", LocalDate.of(2026, 11, 15)));
+
+        assertEquals(5_000, accounts.balance(alice).orElseThrow());
+        assertEquals(5_000, accounts.balance(bob).orElseThrow());
+    }
 }
