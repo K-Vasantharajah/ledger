@@ -55,13 +55,19 @@ public class LedgerService {
         var original = entries.findById(originalId)
                 .orElseThrow(() -> new EntryNotFoundException(originalId));
         var reversal = original.reversal(idempotencyKey, effectiveDate);
-
         var foundId = entries.findIdByIdempotencyKey(idempotencyKey);
         if (foundId.isPresent()) {
             return matchExisting(foundId.get(), reversal);
         }
+
+        if (entries.isReversed(originalId)) {
+            throw new AlreadyReversedException(originalId);
+        }
         try {
-            return entries.saveReversal(reversal, originalId);
+            return tx.execute(status -> {
+                checkNoOverdraft(reversal);
+                return entries.saveReversal(reversal, originalId);
+            });
         } catch (DuplicateKeyException e) {
             var raceWinner = entries.findIdByIdempotencyKey(idempotencyKey);
             if (raceWinner.isPresent()) {
